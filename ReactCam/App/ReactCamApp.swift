@@ -10,6 +10,11 @@ struct ReactCam1App: App {
     }
 }
 
+/// How long the loading bar takes to fill before handing off to HomeView. Kept in one place so
+/// the bar's animation and the actual transition it gates never drift out of sync -- the bar is
+/// only a truthful "how much longer" indicator if it finishes exactly when the wait does.
+private let launchLoadDuration: Double = 1.0
+
 struct AppLaunchView: View {
     @State private var isLaunching = true
 
@@ -25,7 +30,7 @@ struct AppLaunchView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + launchLoadDuration) {
                 withAnimation(.easeOut(duration: 0.35)) {
                     isLaunching = false
                 }
@@ -35,6 +40,11 @@ struct AppLaunchView: View {
 }
 
 private struct LaunchScreenView: View {
+    // Starts just above zero (rather than 0) so the bar visibly renders with a sliver of fill
+    // immediately on appear, instead of a beat of looking empty/frozen before the animation
+    // below has a chance to kick in.
+    @State private var progress: Double = 0.05
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -51,9 +61,15 @@ private struct LaunchScreenView: View {
                     .font(.largeTitle.bold())
                     .foregroundStyle(.white)
 
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.2)
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(.white)
+                    .frame(width: 160)
+            }
+        }
+        .onAppear {
+            withAnimation(.linear(duration: launchLoadDuration)) {
+                progress = 1.0
             }
         }
     }

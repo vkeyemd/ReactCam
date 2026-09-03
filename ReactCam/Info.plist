@@ -4,5 +4,12 @@
 <dict>
 	<key>CameraPrivacy - Microphone Usage Description</key>
 	<string>ReactCam needs your microphone to capture audio during recording.</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchLogo</string>
+	</dict>
 </dict>
 </plist>
