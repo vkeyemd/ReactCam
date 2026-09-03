@@ -1,0 +1,387 @@
+{
+ "schemaVersion": 1,
+ "baseLanguageCode": "en",
+ "artboards": [
+  {
+   "id": "74FB7BC8-A16A-4A0F-AD8E-573880BD4661",
+   "name": "Hero",
+   "sequenceIndex": 1,
+   "sizePresetID": "app_store_iphone",
+   "size": [
+    1.6125,
+    3.495
+   ],
+   "position": [
+    -3.4656,
+    0.0,
+    0
+   ],
+   "cameraProjection": "perspective",
+   "perspectiveFOVDeg": 35,
+   "orthoHeight": 0.18917927,
+   "background": {
+    "image": {
+     "fill": "fill",
+     "ref": {
+      "name": "preset-bg-7",
+      "type": "bundle"
+     }
+    }
+   },
+   "models": [
+    {
+     "id": "F5FAF78C-4623-4AA5-AB3A-00E439F6988A",
+     "sourceModelID": "F5FAF78C-4623-4AA5-AB3A-00E439F6988A",
+     "assetName": "iPhone17ProMax",
+     "instanceLabel": "iPhone16",
+     "deviceStyle": "realistic",
+     "clayColorHex": "#CCCCCCFF",
+     "rotationEuler": [
+      0,
+      -0.46381047,
+      -0.66531944
+     ],
+     "scale": [
+      1.09,
+      1.09,
+      1.09
+     ],
+     "positionOffset": [
+      0.0,
+      0.012,
+      0
+     ],
+     "uiOnlyOverlayCornerRadiusFactor": 0,
+     "screenImageFilename": "BB2F9046-1A0B-45D0-86D0-DDA289F6D86E.png"
+    }
+   ],
+   "textBlocks": [
+    {
+     "id": "6A4CD607-21AB-45B9-9ABB-256A566AB9FE",
+     "index": 0,
+     "string": "ReactCam",
+     "role": "Title",
+     "fontFamily": "Avenir Next",
+     "sizePt": 44,
+     "weight": "heavy",
+     "colorHex": "#F5FCFFFF",
+     "alignment": "center",
+     "horizontalAlignment": "leading",
+     "paddingTop": 80.8,
+     "paddingSides": 24.898407794676803,
+     "isItalic": false,
+     "isUnderlined": false
+    },
+    {
+     "id": "C18768E1-56BF-4E0A-9C0F-3C6C6AB055A7",
+     "index": 1,
+     "string": "Capture your kid's reaction to anything.",
+     "role": "SubTitle",
+     "fontFamily": "System Default",
+     "sizePt": 30,
+     "weight": "regular",
+     "colorHex": "#E3F0FFFF",
+     "alignment": "center",
+     "horizontalAlignment": "center",
+     "paddingTop": 89.53035884030417,
+     "paddingSides": 0.0,
+     "isItalic": false,
+     "isUnderlined": false
+    }
+   ],
+   "imageBlocks": []
+  },
+  {
+   "id": "95DD0771-E446-4D18-99A7-C3CFAAF9038E",
+   "name": "02-pip-record",
+   "sequenceIndex": 2,
+   "sizePresetID": "app_store_iphone",
+   "size": [
+    1.6125,
+    3.495
+   ],
+   "position": [
+    -1.7328,
+    0.0,
+    0
+   ],
+   "cameraProjection": "perspective",
+   "perspectiveFOVDeg": 35,
+   "orthoHeight": 0.18917927,
+   "background": {
+    "image": {
+     "fill": "fill",
+     "ref": {
+      "name": "preset-bg-7",
+      "type": "bundle"
+     }
+    }
+   },
+   "models": [
+    {
+     "id": "6A09906C-8FB9-4C3B-A56A-8E9EE1A8B424",
+     "sourceModelID": "6A09906C-8FB9-4C3B-A56A-8E9EE1A8B424",
+     "assetName": "iPhone17ProMax",
+     "instanceLabel": "iPhone16",
+     "deviceStyle": "realistic",
+     "clayColorHex": "#CCCCCCFF",
+     "rotationEuler": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ],
+     "positionOffset": [
+      0,
+      0,
+      0
+     ],
+     "uiOnlyOverlayCornerRadiusFactor": 0,
+     "screenImageFilename": "8B4F1970-497C-4CE3-ABA8-1C688B699B35.png"
+    }
+   ],
+   "textBlocks": [
+    {
+     "id": "1EF73102-8016-4000-9F4D-6F3CD616ADD2",
+     "index": 0,
+     "string": "Picture-in-picture reactions",
+     "role": "Text1",
+     "fontFamily": "System Default",
+     "sizePt": 40,
+     "weight": "heavy",
+     "colorHex": "#FFFFFFFF",
+     "alignment": "center",
+     "horizontalAlignment": "center",
+     "paddingTop": 93.38908032319392,
+     "paddingSides": 0.0,
+     "isItalic": false,
+     "isUnderlined": false
+    }
+   ],
+   "imageBlocks": []
+  },
+  {
+   "id": "4AE9F924-6F6C-48B6-923E-A0FEBEB1EE4B",
+   "name": "03-pip-swapped",
+   "sequenceIndex": 3,
+   "sizePresetID": "app_store_iphone",
+   "size": [
+    1.6125,
+    3.495
+   ],
+   "position": [
+    0.0,
+    0.0,
+    0
+   ],
+   "cameraProjection": "perspective",
+   "perspectiveFOVDeg": 35,
+   "orthoHeight": 0.18917927,
+   "background": {
+    "image": {
+     "fill": "fill",
+     "ref": {
+      "name": "preset-bg-7",
+      "type": "bundle"
+     }
+    }
+   },
+   "models": [
+    {
+     "id": "7DD8F9E2-8F03-44C7-8504-CCEF4341E1C2",
+     "sourceModelID": "7DD8F9E2-8F03-44C7-8504-CCEF4341E1C2",
+     "assetName": "iPhone17ProMax",
+     "instanceLabel": "iPhone16",
+     "deviceStyle": "realistic",
+     "clayColorHex": "#CCCCCCFF",
+     "rotationEuler": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ],
+     "positionOffset": [
+      0,
+      0,
+      0
+     ],
+     "uiOnlyOverlayCornerRadiusFactor": 0,
+     "screenImageFilename": "3A0F2E7D-431D-4419-AC4A-378433775DDF.png"
+    }
+   ],
+   "textBlocks": [
+    {
+     "id": "05D9F9D5-1299-4E81-B5D8-55CFB1AA1607",
+     "index": 0,
+     "string": "One tap to start recording",
+     "role": "Text1",
+     "fontFamily": "System Default",
+     "sizePt": 40,
+     "weight": "heavy",
+     "colorHex": "#FFFFFFFF",
+     "alignment": "center",
+     "horizontalAlignment": "center",
+     "paddingTop": 93.38908032319392,
+     "paddingSides": 0.0,
+     "isItalic": false,
+     "isUnderlined": false
+    }
+   ],
+   "imageBlocks": []
+  },
+  {
+   "id": "2BF541F4-961C-48AA-9D13-8F9B104289BB",
+   "name": "04-export-portrait",
+   "sequenceIndex": 4,
+   "sizePresetID": "app_store_iphone",
+   "size": [
+    1.6125,
+    3.495
+   ],
+   "position": [
+    1.7328,
+    0.0,
+    0
+   ],
+   "cameraProjection": "perspective",
+   "perspectiveFOVDeg": 35,
+   "orthoHeight": 0.18917927,
+   "background": {
+    "image": {
+     "fill": "fill",
+     "ref": {
+      "name": "preset-bg-7",
+      "type": "bundle"
+     }
+    }
+   },
+   "models": [
+    {
+     "id": "6F544846-4AEF-403C-930C-C2EACE50A7A6",
+     "sourceModelID": "6F544846-4AEF-403C-930C-C2EACE50A7A6",
+     "assetName": "iPhone17ProMax",
+     "instanceLabel": "iPhone16",
+     "deviceStyle": "realistic",
+     "clayColorHex": "#CCCCCCFF",
+     "rotationEuler": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ],
+     "positionOffset": [
+      0,
+      0,
+      0
+     ],
+     "uiOnlyOverlayCornerRadiusFactor": 0,
+     "screenImageFilename": "3BEA1A44-7469-4D9B-83CE-3BCE644C6A5E.png"
+    }
+   ],
+   "textBlocks": [
+    {
+     "id": "A0FB4FAC-C5D8-4750-BC8B-4A10E38CFCE2",
+     "index": 0,
+     "string": "Drag, pinch and swap layers",
+     "role": "Text1",
+     "fontFamily": "System Default",
+     "sizePt": 40,
+     "weight": "heavy",
+     "colorHex": "#FFFFFFFF",
+     "alignment": "center",
+     "horizontalAlignment": "center",
+     "paddingTop": 93.38908032319392,
+     "paddingSides": 0.0,
+     "isItalic": false,
+     "isUnderlined": false
+    }
+   ],
+   "imageBlocks": []
+  },
+  {
+   "id": "E24FC113-B84A-45AA-AEEB-8ECD8FD01C29",
+   "name": "05-export-landscape",
+   "sequenceIndex": 5,
+   "sizePresetID": "app_store_iphone",
+   "size": [
+    1.6125,
+    3.495
+   ],
+   "position": [
+    3.4656,
+    0.0,
+    0
+   ],
+   "cameraProjection": "perspective",
+   "perspectiveFOVDeg": 35,
+   "orthoHeight": 0.18917927,
+   "background": {
+    "image": {
+     "fill": "fill",
+     "ref": {
+      "name": "preset-bg-7",
+      "type": "bundle"
+     }
+    }
+   },
+   "models": [
+    {
+     "id": "F932A993-5995-4D63-AACA-012F2ECBF3B8",
+     "sourceModelID": "F932A993-5995-4D63-AACA-012F2ECBF3B8",
+     "assetName": "iPhone17ProMax",
+     "instanceLabel": "iPhone16",
+     "deviceStyle": "realistic",
+     "clayColorHex": "#CCCCCCFF",
+     "rotationEuler": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ],
+     "positionOffset": [
+      0,
+      0,
+      0
+     ],
+     "uiOnlyOverlayCornerRadiusFactor": 0,
+     "screenImageFilename": "B7F5C557-992E-49BD-AE45-BF3B6EAC2F50.png"
+    }
+   ],
+   "textBlocks": [
+    {
+     "id": "F07B9465-2E82-4A09-9654-9C94115885D8",
+     "index": 0,
+     "string": "Export portrait or landscape",
+     "role": "Text1",
+     "fontFamily": "System Default",
+     "sizePt": 40,
+     "weight": "heavy",
+     "colorHex": "#FFFFFFFF",
+     "alignment": "center",
+     "horizontalAlignment": "center",
+     "paddingTop": 93.38908032319392,
+     "paddingSides": 0.0,
+     "isItalic": false,
+     "isUnderlined": false
+    }
+   ],
+   "imageBlocks": []
+  }
+ ]
+}

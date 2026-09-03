@@ -1,0 +1,8 @@
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Python
+__pycache__/
