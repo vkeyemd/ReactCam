@@ -83,6 +83,9 @@ final class VideoMerger {
         topLayout: VideoLayoutState,
         bottomLayout: VideoLayoutState,
         isRolesSwapped: Bool,
+        includeTopAudio: Bool = true,
+        topAudioVolume: Float = 1.0,
+        bottomAudioVolume: Float = 1.0,
         progress: @escaping (Float) -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
@@ -95,6 +98,9 @@ final class VideoMerger {
                     topLayout: topLayout,
                     bottomLayout: bottomLayout,
                     isRolesSwapped: isRolesSwapped,
+                    includeTopAudio: includeTopAudio,
+                    topAudioVolume: topAudioVolume,
+                    bottomAudioVolume: bottomAudioVolume,
                     progress: progress
                 )
 
@@ -116,6 +122,9 @@ final class VideoMerger {
         topLayout: VideoLayoutState,
         bottomLayout: VideoLayoutState,
         isRolesSwapped: Bool,
+        includeTopAudio: Bool,
+        topAudioVolume: Float,
+        bottomAudioVolume: Float,
         progress: @escaping (Float) -> Void
     ) async throws -> URL {
         let topAsset = AVAsset(url: topURL)
@@ -140,6 +149,11 @@ final class VideoMerger {
         let bottomStart = bottomTimeRange.start + trimTime
         let duration = CMTimeMinimum(topTimeRange.duration, bottomTimeRange.duration) - trimTime
 
+        // Kept so we can address these specific tracks again below when building the audio mix
+        // (volume levels from the Sound Mixer).
+        var compBottomAudioTrack: AVMutableCompositionTrack?
+        var compTopAudioTrack: AVMutableCompositionTrack?
+
         do {
             try topVideoTrack.insertTimeRange(
                 CMTimeRange(start: topStart, duration: duration),
@@ -161,16 +175,23 @@ final class VideoMerger {
                     of: bottomAudio,
                     at: .zero
                 )
+                compBottomAudioTrack = compAudio
             }
 
-            let topAudioTracks = try await topAsset.loadTracks(withMediaType: .audio)
-            if let topAudio = topAudioTracks.first,
-               let compSourceAudio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-                try? compSourceAudio.insertTimeRange(
-                    CMTimeRange(start: topStart, duration: duration),
-                    of: topAudio,
-                    at: .zero
-                )
+            // Only keep the top track's own audio (the reacted-to video's audio, or the rear
+            // camera's own audio in Dual Camera mode) when the caller has determined it's safe /
+            // desired to -- see the headphone-use note where this flag is computed.
+            if includeTopAudio {
+                let topAudioTracks = try await topAsset.loadTracks(withMediaType: .audio)
+                if let topAudio = topAudioTracks.first,
+                   let compSourceAudio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                    try? compSourceAudio.insertTimeRange(
+                        CMTimeRange(start: topStart, duration: duration),
+                        of: topAudio,
+                        at: .zero
+                    )
+                    compTopAudioTrack = compSourceAudio
+                }
             }
         } catch {
             throw error
@@ -326,6 +347,24 @@ final class VideoMerger {
         exporter.outputURL = exportURL
         exporter.outputFileType = .mp4
         exporter.videoComposition = videoComposition
+
+        // Sound Mixer volumes, applied per audio track at export time.
+        var audioMixParameters: [AVMutableAudioMixInputParameters] = []
+        if let compBottomAudioTrack {
+            let params = AVMutableAudioMixInputParameters(track: compBottomAudioTrack)
+            params.setVolume(bottomAudioVolume, at: .zero)
+            audioMixParameters.append(params)
+        }
+        if let compTopAudioTrack {
+            let params = AVMutableAudioMixInputParameters(track: compTopAudioTrack)
+            params.setVolume(topAudioVolume, at: .zero)
+            audioMixParameters.append(params)
+        }
+        if !audioMixParameters.isEmpty {
+            let audioMix = AVMutableAudioMix()
+            audioMix.inputParameters = audioMixParameters
+            exporter.audioMix = audioMix
+        }
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in

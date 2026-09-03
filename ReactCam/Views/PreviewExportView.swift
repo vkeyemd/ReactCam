@@ -19,9 +19,39 @@ struct InteractivePlayerLayer<G: Gesture>: View {
     }
 }
 
+/// One slider row in the Sound Mixer: an icon that flips to a mute glyph at zero volume, a
+/// label, the slider itself, and a live percentage readout.
+private struct AudioMixerRow: View {
+    let icon: String
+    let label: String
+    @Binding var volume: Float
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: volume <= 0.001 ? "speaker.slash.fill" : icon)
+                .frame(width: 20)
+                .foregroundStyle(volume <= 0.001 ? .red : .white)
+
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .frame(width: 90, alignment: .leading)
+
+            Slider(value: $volume, in: 0...1)
+                .tint(.yellow)
+
+            Text("\(Int(volume * 100))%")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .trailing)
+        }
+    }
+}
+
 struct PreviewExportView: View {
     let topURL: URL
     let bottomURL: URL
+    let includeTopAudio: Bool
     @State private var orientation: ExportOrientation = .portrait
 
     @AppStorage("reactcam.exportCount") private var exportCount = 0
@@ -60,6 +90,12 @@ struct PreviewExportView: View {
     // Warning indicators
     @State private var showOffCanvasWarning = false
 
+    // Sound mixer state
+    @State private var topAudioVolume: Float = 1.0
+    @State private var bottomAudioVolume: Float = 1.0
+    @State private var topAudioAvailable = false
+    @State private var bottomAudioAvailable = false
+
     enum MergeState {
         case editing
         case merging(progress: Float)
@@ -79,9 +115,10 @@ struct PreviewExportView: View {
         }
     }
 
-    init(topURL: URL, bottomURL: URL, orientation: ExportOrientation) {
+    init(topURL: URL, bottomURL: URL, orientation: ExportOrientation, includeTopAudio: Bool = true) {
         self.topURL = topURL
         self.bottomURL = bottomURL
+        self.includeTopAudio = includeTopAudio
         self._orientation = State(initialValue: orientation)
         self._syncController = StateObject(wrappedValue: PlayerSyncController(topURL: topURL, bottomURL: bottomURL))
     }
@@ -252,6 +289,13 @@ struct PreviewExportView: View {
                     }
                     .padding(.horizontal)
 
+                    if topAudioAvailable || bottomAudioAvailable {
+                        Divider()
+                            .background(Color(white: 0.2))
+
+                        soundMixer
+                    }
+
                     Divider()
                         .background(Color(white: 0.2))
                 }
@@ -303,6 +347,12 @@ struct PreviewExportView: View {
         .onDisappear {
             syncController.deinitPlayers()
         }
+        .onChange(of: topAudioVolume) { newValue in
+            syncController.topPlayer?.volume = newValue
+        }
+        .onChange(of: bottomAudioVolume) { newValue in
+            syncController.bottomPlayer?.volume = newValue
+        }
         .sheet(isPresented: $showingPaywall) {
             PaywallView {
                 isProUnlocked = true
@@ -318,6 +368,32 @@ struct PreviewExportView: View {
             Button("OK") { saveErrorMessage = nil }
         } message: { message in
             Text(message)
+        }
+    }
+
+    private var soundMixer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sound Mixer")
+                .font(.caption)
+                .foregroundStyle(.gray)
+                .padding(.horizontal)
+
+            if topAudioAvailable {
+                AudioMixerRow(icon: "film", label: "Video Audio", volume: $topAudioVolume)
+                    .padding(.horizontal)
+            }
+
+            if bottomAudioAvailable {
+                AudioMixerRow(icon: "mic.fill", label: "Your Voice", volume: $bottomAudioVolume)
+                    .padding(.horizontal)
+            }
+
+            if includeTopAudio == false {
+                Text("Video audio isn't included because headphones weren't in use during recording.")
+                    .font(.caption2)
+                    .foregroundStyle(.gray)
+                    .padding(.horizontal)
+            }
         }
     }
 
@@ -546,20 +622,33 @@ struct PreviewExportView: View {
         let bottomSize = try? await bottomTrack.load(.naturalSize)
         let bottomTransform = try? await bottomTrack.load(.preferredTransform)
 
+        let topHasAudioTrack = ((try? await topAsset.loadTracks(withMediaType: .audio)) ?? []).isEmpty == false
+        let bottomHasAudioTrack = ((try? await bottomAsset.loadTracks(withMediaType: .audio)) ?? []).isEmpty == false
+
         if let topSize, let topTransform, let bottomSize, let bottomTransform {
             await MainActor.run {
                 self.topTrackInfo = TrackInfo(naturalSize: topSize, preferredTransform: topTransform)
                 self.bottomTrackInfo = TrackInfo(naturalSize: bottomSize, preferredTransform: bottomTransform)
-                
+
                 // Infer canvas orientation: portrait if height >= width of background asset
                 let isTopPortrait = (topTransform.a == 0 && abs(topTransform.b) == 1)
                 let actualWidth = isTopPortrait ? topSize.height : topSize.width
                 let actualHeight = isTopPortrait ? topSize.width : topSize.height
-                
+
                 self.orientation = (actualHeight >= actualWidth) ? .portrait : .landscape
                 self.isMetadataLoaded = true
                 self.resetToDefault()
-                
+
+                // The mixer only controls audio that will actually end up in the export -- top
+                // audio is only ever kept there when includeTopAudio allowed it in the first place.
+                self.topAudioAvailable = topHasAudioTrack && self.includeTopAudio
+                self.bottomAudioAvailable = bottomHasAudioTrack
+
+                // Mirror the export's audio composition during live preview too, so what you hear
+                // while editing matches what ends up in the final file.
+                self.syncController.topPlayer?.volume = self.topAudioAvailable ? self.topAudioVolume : 0
+                self.syncController.bottomPlayer?.volume = self.bottomAudioVolume
+
                 // Play synched streams
                 self.syncController.play()
             }
@@ -578,6 +667,9 @@ struct PreviewExportView: View {
             topLayout: topLayer,
             bottomLayout: bottomLayer,
             isRolesSwapped: isRolesSwapped,
+            includeTopAudio: includeTopAudio,
+            topAudioVolume: topAudioVolume,
+            bottomAudioVolume: bottomAudioVolume,
             progress: { value in
                 mergeState = .merging(progress: value)
             },

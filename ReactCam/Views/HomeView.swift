@@ -46,6 +46,17 @@ struct HomeView: View {
 
                     VStack(spacing: 16) {
                         Button {
+                            recordingSource = .cameraRollArchitectureWithRearCamera
+                            navigateToStudio = true
+                        } label: {
+                            HomeActionRow(
+                                icon: "camera.on.rectangle",
+                                title: "Dual Camera",
+                                subtitle: "Record with both cameras at once"
+                            )
+                        }
+
+                        Button {
                             showingPhotoPicker = true
                         } label: {
                             HomeActionRow(
@@ -62,17 +73,6 @@ struct HomeView: View {
                                 icon: "folder",
                                 title: "Import from Files",
                                 subtitle: "Browse for an MP4"
-                            )
-                        }
-
-                        Button {
-                            recordingSource = .cameraRollArchitectureWithRearCamera
-                            navigateToStudio = true
-                        } label: {
-                            HomeActionRow(
-                                icon: "camera.on.rectangle",
-                                title: "Rear + Front Camera",
-                                subtitle: "Use the camera-roll layout with a live rear camera feed"
                             )
                         }
                     }

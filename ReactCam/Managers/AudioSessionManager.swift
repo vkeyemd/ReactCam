@@ -39,4 +39,20 @@ enum AudioSessionManager {
             print("Failed to deactivate audio session: \(error)")
         }
     }
+
+    /// Whether audio is currently routing to headphones (wired or Bluetooth) rather than the
+    /// built-in speaker. Used to decide whether it's safe to keep a reacted-to video's own audio
+    /// track in the final export: without headphones, that audio plays out of the speaker and
+    /// bleeds into the microphone recording already, so re-adding it separately would double it up.
+    static var isUsingHeadphones: Bool {
+        let headphoneLikePorts: Set<AVAudioSession.Port> = [
+            .headphones,
+            .bluetoothA2DP,
+            .bluetoothHFP,
+            .bluetoothLE
+        ]
+        return AVAudioSession.sharedInstance().currentRoute.outputs.contains {
+            headphoneLikePorts.contains($0.portType)
+        }
+    }
 }

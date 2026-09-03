@@ -14,12 +14,15 @@ struct RecordingStudioView: View {
     @State private var mergeInputs: MergeInputs?
     @State private var playerEndObserver: AnyCancellable?
     @State private var isVideoLoading = false
+    @State private var showHeadphoneWarning = false
+    @State private var hasAcknowledgedHeadphoneWarning = false
 
     struct MergeInputs: Identifiable, Hashable {
         let id = UUID()
         let topURL: URL
         let bottomURL: URL
         let orientation: ExportOrientation
+        let includeTopAudio: Bool
     }
 
     var body: some View {
@@ -32,7 +35,8 @@ struct RecordingStudioView: View {
                         PreviewExportView(
                             topURL: inputs.topURL,
                             bottomURL: inputs.bottomURL,
-                            orientation: inputs.orientation
+                            orientation: inputs.orientation,
+                            includeTopAudio: inputs.includeTopAudio
                         )
                     }
                 },
@@ -102,6 +106,15 @@ struct RecordingStudioView: View {
         .navigationBarHidden(true)
         .onAppear { setUp() }
         .onDisappear { tearDown() }
+        .alert("Use Headphones for Best Audio", isPresented: $showHeadphoneWarning) {
+            Button("Start Recording") {
+                hasAcknowledgedHeadphoneWarning = true
+                startRecording()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Headphone use is strongly encouraged in this mode to reduce sound artifacts in your final video.")
+        }
     }
 
     @ViewBuilder
@@ -179,6 +192,11 @@ struct RecordingStudioView: View {
     private func toggleRecording() {
         if isRecording {
             stopRecording()
+        } else if case .importedVideo = source, !hasAcknowledgedHeadphoneWarning {
+            // Reacting to a played-back video risks the source audio bleeding into the mic
+            // recording (and doubling up if we also keep the source's own audio track), so warn
+            // once per session before the very first take in this mode.
+            showHeadphoneWarning = true
         } else {
             startRecording()
         }
@@ -190,13 +208,19 @@ struct RecordingStudioView: View {
 
         switch source {
         case .importedVideo(let sourceURL):
+            // Only keep the reacted-to video's own audio track in the final export if headphones
+            // were actually in use for this take -- otherwise its audio already bled into the mic
+            // recording via the speaker, and re-adding it separately would double it up.
+            let includeTopAudio = AudioSessionManager.isUsingHeadphones
+
             cameraManager.startRecording { reactionURL, primaryURL in
                 guard let reactionURL else { return }
                 let finalTopURL = primaryURL ?? sourceURL
                 mergeInputs = MergeInputs(
                     topURL: finalTopURL,
                     bottomURL: reactionURL,
-                    orientation: currentOrientation
+                    orientation: currentOrientation,
+                    includeTopAudio: includeTopAudio
                 )
             }
 
@@ -204,12 +228,15 @@ struct RecordingStudioView: View {
             player?.play()
 
         case .cameraRollArchitectureWithRearCamera:
+            // Both feeds are live camera captures on the same device, not played-back audio, so
+            // there's no bleed-through/doubling risk -- always keep the rear camera's own audio.
             cameraManager.startRecording { reactionURL, primaryURL in
                 guard let reactionURL, let primaryURL else { return }
                 mergeInputs = MergeInputs(
                     topURL: primaryURL,
                     bottomURL: reactionURL,
-                    orientation: currentOrientation
+                    orientation: currentOrientation,
+                    includeTopAudio: true
                 )
             }
         }
