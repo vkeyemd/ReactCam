@@ -17,7 +17,7 @@ struct PaywallView: View {
 
             Image(systemName: "star.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(.yellow)
+                .foregroundStyle(Color.accentColor)
 
             Text("Unlock More Exports")
                 .font(.title2.bold())
@@ -36,7 +36,7 @@ struct PaywallView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.yellow, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(.black)
                 }
 

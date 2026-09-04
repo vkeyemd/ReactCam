@@ -38,7 +38,7 @@ private struct AudioMixerRow: View {
                 .frame(width: 90, alignment: .leading)
 
             Slider(value: $volume, in: 0...1)
-                .tint(.yellow)
+                .tint(.accentColor)
 
             Text("\(Int(volume * 100))%")
                 .font(.caption)
@@ -221,7 +221,7 @@ struct PreviewExportView: View {
             if showOffCanvasWarning {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(.orange)
                     Text("Warning: One of your videos is fully outside the canvas bounds!")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -230,7 +230,7 @@ struct PreviewExportView: View {
                     }
                     .font(.caption)
                     .bold()
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(.orange)
                 }
                 .padding(.horizontal)
                 .transition(.opacity)
@@ -310,7 +310,7 @@ struct PreviewExportView: View {
                 VStack(spacing: 8) {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
-                        .tint(.yellow)
+                        .tint(.accentColor)
 
                     Text("Processing & Merging Layout (\(Int(progress * 100))%)…")
                         .font(.caption)
@@ -330,7 +330,7 @@ struct PreviewExportView: View {
                         mergeState = .editing
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(Color.accentColor)
                 }
                 .padding()
             }
@@ -433,6 +433,20 @@ struct PreviewExportView: View {
                         .foregroundStyle(.white)
                 }
             }
+
+            // A clear next step once the export has actually landed in Photos, instead of
+            // leaving the user to find their own way back out via the nav bar.
+            if didSaveSuccessfully {
+                Button {
+                    NotificationCenter.default.post(name: .returnToHome, object: nil)
+                } label: {
+                    Text("Done")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .foregroundStyle(.white)
+                }
+            }
         }
         .padding(.horizontal)
     }
@@ -458,7 +472,7 @@ struct PreviewExportView: View {
             return .green
         }
 
-        return .yellow
+        return .accentColor
     }
 
     private var exportButtonTextColor: Color {

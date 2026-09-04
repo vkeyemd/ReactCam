@@ -6,6 +6,12 @@ struct ReactCam1App: App {
         WindowGroup {
             AppLaunchView()
                 .preferredColorScheme(.dark)
+                // Single app-wide accent so every system-styled control (nav links, buttons,
+                // pickers, toggles, alerts) matches one brand color throughout, instead of
+                // falling back to the system default blue in some places and a hardcoded color
+                // in others. Sourced from the AccentColor asset, which is set to the same light
+                // blue as the app logo's background.
+                .tint(.accentColor)
         }
     }
 }

@@ -1,6 +1,6 @@
 import CoreGraphics
 
-enum ExportOrientation: String, CaseIterable, Identifiable {
+enum ExportOrientation: String, CaseIterable, Identifiable, Codable {
     case portrait
     case landscape
 

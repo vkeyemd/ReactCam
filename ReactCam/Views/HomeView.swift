@@ -3,9 +3,11 @@ import SwiftUI
 struct HomeView: View {
     @State private var showingPhotoPicker = false
     @State private var showingFilePicker = false
+    @State private var showingImportSourceChooser = false
     @State private var recordingSource: RecordingSource?
     @State private var showingImportError = false
     @State private var navigateToStudio = false
+    @State private var navigateToProjects = false
 
     var body: some View {
         NavigationView {
@@ -18,6 +20,11 @@ struct HomeView: View {
                     },
                     isActive: $navigateToStudio
                 ) {
+                    EmptyView()
+                }
+                .hidden()
+
+                NavigationLink(destination: ProjectsView(), isActive: $navigateToProjects) {
                     EmptyView()
                 }
                 .hidden()
@@ -57,22 +64,31 @@ struct HomeView: View {
                         }
 
                         Button {
-                            showingPhotoPicker = true
+                            showingImportSourceChooser = true
                         } label: {
                             HomeActionRow(
-                                icon: "photo.on.rectangle",
-                                title: "Import from Camera Roll",
-                                subtitle: "Pick a video to react to"
+                                icon: "square.and.arrow.down",
+                                title: "Import Video",
+                                subtitle: "From Camera Roll or Files"
                             )
+                        }
+                        .confirmationDialog("Import Video", isPresented: $showingImportSourceChooser, titleVisibility: .visible) {
+                            Button("Camera Roll") {
+                                showingPhotoPicker = true
+                            }
+                            Button("Files") {
+                                showingFilePicker = true
+                            }
+                            Button("Cancel", role: .cancel) {}
                         }
 
                         Button {
-                            showingFilePicker = true
+                            navigateToProjects = true
                         } label: {
                             HomeActionRow(
                                 icon: "folder",
-                                title: "Import from Files",
-                                subtitle: "Browse for an MP4"
+                                title: "Projects",
+                                subtitle: "Re-export past recordings"
                             )
                         }
                     }
@@ -111,6 +127,12 @@ struct HomeView: View {
             }
             .alert("Couldn't import that video", isPresented: $showingImportError) {
                 Button("OK", role: .cancel) {}
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .returnToHome)) { _ in
+                // Resetting these tears down whatever's pushed on top, however deep -- Recording
+                // Studio -> Editor, or Projects -> Editor.
+                navigateToStudio = false
+                navigateToProjects = false
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

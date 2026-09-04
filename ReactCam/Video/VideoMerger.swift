@@ -32,11 +32,19 @@ enum VideoMergerError: LocalizedError {
 }
 
 final class VideoMerger {
-    
+
     enum MergerLayerType {
         case top
         case bottom
     }
+
+    /// Leading interval trimmed off the start of *each* source clip before merging -- skips the
+    /// first fraction of a second of a fresh recording, where the camera's auto-exposure/focus is
+    /// often still settling. Exposed so the live editor preview (PlayerSyncController) can start
+    /// and loop from this exact same point; otherwise "frame zero" as shown live doesn't match
+    /// what actually becomes frame zero of the exported file, which reads as a shift whenever
+    /// there's any motion in that trimmed sliver.
+    static let trimStart = CMTime(seconds: 0.1, preferredTimescale: 600)
 
     /// Centralized coordinate definitions for starting layout configurations.
     /// - Portrait: Top layer fills canvas; bottom layer sits in bottom-right corner as a PiP overlay.
@@ -144,10 +152,9 @@ final class VideoMerger {
         let topTimeRange = try await topAssetTrack.load(.timeRange)
         let bottomTimeRange = try await bottomAssetTrack.load(.timeRange)
 
-        let trimTime = CMTime(seconds: 0.1, preferredTimescale: 600)
-        let topStart = topTimeRange.start + trimTime
-        let bottomStart = bottomTimeRange.start + trimTime
-        let duration = CMTimeMinimum(topTimeRange.duration, bottomTimeRange.duration) - trimTime
+        let topStart = topTimeRange.start + trimStart
+        let bottomStart = bottomTimeRange.start + trimStart
+        let duration = CMTimeMinimum(topTimeRange.duration, bottomTimeRange.duration) - trimStart
 
         // Kept so we can address these specific tracks again below when building the audio mix
         // (volume levels from the Sound Mixer).
@@ -217,7 +224,7 @@ final class VideoMerger {
         let bottomNaturalSize = try await bottomAssetTrack.load(.naturalSize)
         let bottomPreferredTransform = try await bottomAssetTrack.load(.preferredTransform)
 
-        let topTransform = calculateTransform(
+        var topTransform = calculateTransform(
             naturalSize: topNaturalSize,
             preferredTransform: topPreferredTransform,
             targetRect: topRect,
@@ -226,7 +233,7 @@ final class VideoMerger {
             offset: topLayout.offset
         )
 
-        let bottomTransform = calculateTransform(
+        var bottomTransform = calculateTransform(
             naturalSize: bottomNaturalSize,
             preferredTransform: bottomPreferredTransform,
             targetRect: bottomRect,
@@ -235,24 +242,45 @@ final class VideoMerger {
             offset: bottomLayout.offset
         )
 
+        // TEMPORARY EXPERIMENTAL FIX -- landscape only. User-reported "shifted down" output;
+        // testing whether a fixed pixel nudge resolves it (as opposed to the trim-time/content-
+        // motion mismatch we otherwise suspect). Shifts the whole composited landscape frame up
+        // by a constant 150px. Remove or tune once we know if this actually fixes it.
+        if orientation == .landscape {
+            let hardcodedLandscapeShiftUp = CGAffineTransform(translationX: 0, y: -375)
+            topTransform = topTransform.concatenating(hardcodedLandscapeShiftUp)
+            bottomTransform = bottomTransform.concatenating(hardcodedLandscapeShiftUp)
+        }
+
         topLayerInstruction.setTransform(topTransform, at: .zero)
         bottomLayerInstruction.setTransform(bottomTransform, at: .zero)
 
         // Stacking order
         //
         // AVFoundation's compositor corrupts the geometry of whichever layer instruction is
-        // listed *second* in `layerInstructions` when one source has a rotated preferredTransform
-        // (e.g. a portrait-shot camera recording) and the other has an identity transform (e.g.
-        // an already-landscape imported clip) -- the corrupted track renders sampled from the
-        // wrong region, appearing shifted. Landscape's two halves are laid out side-by-side and
-        // never overlap, so array order has no visible effect on stacking there; always list the
-        // rotated source first in that case to sidestep the corruption. Portrait's layers do
-        // overlap (full-bleed background + corner PIP), so its stacking keeps following isTopMost.
+        // listed *second* in `layerInstructions` whenever a landscape-*displayed* (upright width >
+        // height) source is listed before a portrait-*displayed* (upright height > width) one --
+        // the portrait one then renders sampled from the wrong region, appearing shifted. This is
+        // about each source's actual upright aspect, not its preferredTransform: it happens for an
+        // identity-transform landscape clip paired with a rotated portrait clip, but equally for
+        // two identity-transform clips whose upright shapes simply differ. (An earlier version of
+        // this fix only checked preferredTransform "rotated-ness", which covered the first case but
+        // missed the second -- confirmed by reproducing both directly against the real AVFoundation
+        // pipeline.) Landscape's two halves are laid out side-by-side and never overlap, so array
+        // order has no visible effect on stacking there; always list the portrait-shaped source
+        // first in that case to sidestep the corruption. Portrait orientation's layers do overlap
+        // (full-bleed background + corner PIP), so its stacking keeps following isTopMost.
         let topIsRotated = (topPreferredTransform.a == 0 && abs(topPreferredTransform.b) == 1)
         let bottomIsRotated = (bottomPreferredTransform.a == 0 && abs(bottomPreferredTransform.b) == 1)
+        let topActualWidth = topIsRotated ? topNaturalSize.height : topNaturalSize.width
+        let topActualHeight = topIsRotated ? topNaturalSize.width : topNaturalSize.height
+        let bottomActualWidth = bottomIsRotated ? bottomNaturalSize.height : bottomNaturalSize.width
+        let bottomActualHeight = bottomIsRotated ? bottomNaturalSize.width : bottomNaturalSize.height
+        let topIsDisplayedPortrait = topActualHeight > topActualWidth
+        let bottomIsDisplayedPortrait = bottomActualHeight > bottomActualWidth
 
-        if orientation == .landscape && topIsRotated != bottomIsRotated {
-            instruction.layerInstructions = topIsRotated
+        if orientation == .landscape && topIsDisplayedPortrait != bottomIsDisplayedPortrait {
+            instruction.layerInstructions = topIsDisplayedPortrait
                 ? [topLayerInstruction, bottomLayerInstruction]
                 : [bottomLayerInstruction, topLayerInstruction]
         } else if bottomLayout.isTopMost {
@@ -281,20 +309,25 @@ final class VideoMerger {
         if isOverlayTopMost && orientation == .portrait {
             let borderLayerContainer = CALayer()
             borderLayerContainer.frame = CGRect(origin: .zero, size: renderSize)
-            
-            // Flip vertically to match top-left AVVideoComposition space
+
+            // Flip vertically to match top-left AVVideoComposition space. This flip is applied
+            // around the layer's anchor point, so the anchor must be pinned to the origin (.zero)
+            // -- leaving it at the CALayer default of (0.5, 0.5) combines with `position` below to
+            // silently add a spurious (renderSize.width/2, renderSize.height/2) offset, which is
+            // what put the border in the wrong corner of the frame.
+            borderLayerContainer.anchorPoint = .zero
             borderLayerContainer.transform = CATransform3DMakeScale(1, -1, 1)
             borderLayerContainer.position = CGPoint(x: 0, y: renderSize.height)
 
             let borderLayer = CAShapeLayer()
             borderLayer.anchorPoint = .zero
-            
+
             if overlayTrackIsTopTrack {
                 let isTopPortrait = (topPreferredTransform.a == 0 && abs(topPreferredTransform.b) == 1)
                 let topActualWidth = isTopPortrait ? topNaturalSize.height : topNaturalSize.width
                 let topActualHeight = isTopPortrait ? topNaturalSize.width : topNaturalSize.height
                 let topAssetActualSize = CGSize(width: topActualWidth, height: topActualHeight)
-                
+
                 borderLayer.frame = CGRect(origin: .zero, size: topAssetActualSize)
                 borderLayer.path = UIBezierPath(
                     roundedRect: borderLayer.bounds.insetBy(dx: 5, dy: 5),
@@ -303,13 +336,28 @@ final class VideoMerger {
                 borderLayer.strokeColor = UIColor.white.cgColor
                 borderLayer.fillColor = UIColor.clear.cgColor
                 borderLayer.lineWidth = 10
-                borderLayer.transform = CATransform3DMakeAffineTransform(topTransform)
+                // borderLayer's bounds are topAssetActualSize -- the already-upright asset
+                // dimensions -- but topTransform starts by applying the real (rotated)
+                // preferredTransform, which expects points in the raw pre-rotation track space.
+                // Feeding upright-space bounds through it double-applies the rotation, which is
+                // what corrupted both the border's position and its width/height. Build a
+                // border-specific transform the same way the (already-verified-correct) SwiftUI
+                // preview does: upright size paired with an identity preferredTransform.
+                let borderTopTransform = calculateTransform(
+                    naturalSize: topAssetActualSize,
+                    preferredTransform: .identity,
+                    targetRect: topRect,
+                    mirrorHorizontally: false,
+                    scale: topLayout.scale,
+                    offset: topLayout.offset
+                )
+                borderLayer.transform = CATransform3DMakeAffineTransform(borderTopTransform)
             } else {
                 let isBottomPortrait = (bottomPreferredTransform.a == 0 && abs(bottomPreferredTransform.b) == 1)
                 let bottomActualWidth = isBottomPortrait ? bottomNaturalSize.height : bottomNaturalSize.width
                 let bottomActualHeight = isBottomPortrait ? bottomNaturalSize.width : bottomNaturalSize.height
                 let bottomAssetActualSize = CGSize(width: bottomActualWidth, height: bottomActualHeight)
-                
+
                 borderLayer.frame = CGRect(origin: .zero, size: bottomAssetActualSize)
                 borderLayer.path = UIBezierPath(
                     roundedRect: borderLayer.bounds.insetBy(dx: 5, dy: 5),
@@ -318,7 +366,16 @@ final class VideoMerger {
                 borderLayer.strokeColor = UIColor.white.cgColor
                 borderLayer.fillColor = UIColor.clear.cgColor
                 borderLayer.lineWidth = 10
-                borderLayer.transform = CATransform3DMakeAffineTransform(bottomTransform)
+                // See the matching comment in the topAssetActualSize branch above.
+                let borderBottomTransform = calculateTransform(
+                    naturalSize: bottomAssetActualSize,
+                    preferredTransform: .identity,
+                    targetRect: bottomRect,
+                    mirrorHorizontally: true,
+                    scale: bottomLayout.scale,
+                    offset: bottomLayout.offset
+                )
+                borderLayer.transform = CATransform3DMakeAffineTransform(borderBottomTransform)
             }
 
             borderLayerContainer.addSublayer(borderLayer)

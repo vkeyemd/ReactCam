@@ -16,6 +16,14 @@ struct RecordingStudioView: View {
     @State private var isVideoLoading = false
     @State private var showHeadphoneWarning = false
     @State private var hasAcknowledgedHeadphoneWarning = false
+    @State private var recordingStartDate: Date?
+
+    private var sourceLabel: String {
+        switch source {
+        case .importedVideo: return "Reacting to Video"
+        case .cameraRollArchitectureWithRearCamera: return "Dual Camera"
+        }
+    }
 
     struct MergeInputs: Identifiable, Hashable {
         let id = UUID()
@@ -51,6 +59,9 @@ struct RecordingStudioView: View {
 
             VStack(spacing: 0) {
                 RecordingStudioTopBar(
+                    title: sourceLabel,
+                    isRecording: isRecording,
+                    recordingStartDate: recordingStartDate,
                     onBack: { }
                 )
 
@@ -204,6 +215,7 @@ struct RecordingStudioView: View {
 
     private func startRecording() {
         isRecording = true
+        recordingStartDate = Date()
         let currentOrientation = orientation
 
         switch source {
@@ -216,11 +228,12 @@ struct RecordingStudioView: View {
             cameraManager.startRecording { reactionURL, primaryURL in
                 guard let reactionURL else { return }
                 let finalTopURL = primaryURL ?? sourceURL
-                mergeInputs = MergeInputs(
+                finishRecording(
                     topURL: finalTopURL,
                     bottomURL: reactionURL,
                     orientation: currentOrientation,
-                    includeTopAudio: includeTopAudio
+                    includeTopAudio: includeTopAudio,
+                    sourceLabel: "Imported Video"
                 )
             }
 
@@ -232,25 +245,68 @@ struct RecordingStudioView: View {
             // there's no bleed-through/doubling risk -- always keep the rear camera's own audio.
             cameraManager.startRecording { reactionURL, primaryURL in
                 guard let reactionURL, let primaryURL else { return }
-                mergeInputs = MergeInputs(
+                finishRecording(
                     topURL: primaryURL,
                     bottomURL: reactionURL,
                     orientation: currentOrientation,
-                    includeTopAudio: true
+                    includeTopAudio: true,
+                    sourceLabel: "Dual Camera"
                 )
             }
+        }
+    }
+
+    /// Every time a recording finishes, save it as a Project -- durable copies of the raw source
+    /// clips the user can come back to and re-export as often as they like (e.g. once in portrait,
+    /// again in landscape) -- rather than relying on the OS temp files CameraManager/the pickers
+    /// hand back, which aren't guaranteed to survive between launches.
+    private func finishRecording(
+        topURL: URL,
+        bottomURL: URL,
+        orientation: ExportOrientation,
+        includeTopAudio: Bool,
+        sourceLabel: String
+    ) {
+        let project = ProjectStore.shared.createProject(
+            topSourceURL: topURL,
+            bottomSourceURL: bottomURL,
+            sourceLabel: sourceLabel,
+            orientation: orientation,
+            includeTopAudio: includeTopAudio
+        )
+
+        if let project {
+            mergeInputs = MergeInputs(
+                topURL: ProjectStore.shared.topURL(for: project),
+                bottomURL: ProjectStore.shared.bottomURL(for: project),
+                orientation: orientation,
+                includeTopAudio: includeTopAudio
+            )
+        } else {
+            // Saving the project failed (e.g. disk space) -- still let the user edit and export
+            // this take from the original (temp) URLs rather than losing the recording outright.
+            mergeInputs = MergeInputs(
+                topURL: topURL,
+                bottomURL: bottomURL,
+                orientation: orientation,
+                includeTopAudio: includeTopAudio
+            )
         }
     }
 
     private func stopRecording() {
         guard isRecording else { return }
         isRecording = false
+        recordingStartDate = nil
         player?.pause()
         cameraManager.stopRecording()
     }
 }
 
 private struct RecordingStudioTopBar: View {
+    let title: String
+    let isRecording: Bool
+    let recordingStartDate: Date?
     let onBack: () -> Void
     @Environment(\.presentationMode) private var presentationMode
 
@@ -267,10 +323,14 @@ private struct RecordingStudioTopBar: View {
 
             Spacer()
 
-            Text("Picture in Picture")
-                .font(.headline)
-                .bold()
-                .foregroundColor(.white)
+            if isRecording, let recordingStartDate {
+                RecordingTimerLabel(startDate: recordingStartDate)
+            } else {
+                Text(title)
+                    .font(.headline)
+                    .bold()
+                    .foregroundColor(.white)
+            }
 
             Spacer()
 
@@ -280,6 +340,31 @@ private struct RecordingStudioTopBar: View {
         }
         .foregroundStyle(.white)
         .padding(.vertical, 8)
+    }
+}
+
+/// Live elapsed-time readout ("0:07", "1:23"...) shown in place of the static title while
+/// recording, so there's some feedback on clip length before you stop.
+private struct RecordingTimerLabel: View {
+    let startDate: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: startDate, by: 1.0)) { context in
+            let elapsed = max(0, Int(context.date.timeIntervalSince(startDate)))
+            let minutes = elapsed / 60
+            let seconds = elapsed % 60
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 8, height: 8)
+
+                Text(String(format: "%d:%02d", minutes, seconds))
+                    .font(.headline.monospacedDigit())
+                    .bold()
+                    .foregroundColor(.white)
+            }
+        }
     }
 }
 
