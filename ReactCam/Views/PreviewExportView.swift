@@ -48,14 +48,19 @@ private struct AudioMixerRow: View {
     }
 }
 
+/// Pinned for a future version: the implementation below (snappedLayout/snapIfNeeded and the
+/// toggle in the control panel) is intact and working, just hidden/inactive for this release.
+/// Flip to `true` to resume work on it.
+private let isMagneticSnapFeatureEnabled = false
+
 struct PreviewExportView: View {
     let topURL: URL
     let bottomURL: URL
     let includeTopAudio: Bool
     @State private var orientation: ExportOrientation = .portrait
 
-    @AppStorage("reactcam.exportCount") private var exportCount = 0
-    @AppStorage("reactcam.isProUnlocked") private var isProUnlocked = false
+    @EnvironmentObject private var purchaseManager: PurchaseManager
+    @EnvironmentObject private var usageTracker: UsageTracker
 
     // Layout configuration states
     @State private var topLayer = VideoLayoutState(scale: 1.0, offset: .zero, isTopMost: false)
@@ -63,6 +68,10 @@ struct PreviewExportView: View {
 
     // Layout role state: when true, the videos switch roles (top track becomes overlay, bottom track becomes background)
     @State private var isRolesSwapped = false
+
+    // When on, releasing a drag or pinch snaps the layer back to fully cover its target rect --
+    // no blank canvas gaps, and no wandering into the neighboring layer's area in landscape.
+    @State private var isSnapEnabled = true
 
     // Gesture temp active states
     @State private var activeTopDragOffset: CGSize = .zero
@@ -80,7 +89,7 @@ struct PreviewExportView: View {
 
     // UI & Merge State
     @State private var mergeState: MergeState = .editing
-    @State private var showingPaywall = false
+    @State private var paywallReason: Monetization.PaywallReason?
     @State private var showingShareSheet = false
     @State private var saveErrorMessage: String?
     @State private var didSaveSuccessfully = false
@@ -122,8 +131,6 @@ struct PreviewExportView: View {
         self._orientation = State(initialValue: orientation)
         self._syncController = StateObject(wrappedValue: PlayerSyncController(topURL: topURL, bottomURL: bottomURL))
     }
-
-    private var isFirstExportFree: Bool { exportCount == 0 }
 
     /// Fixed reference frame the drag gesture measures against — the render-size canvas
     /// container, captured BEFORE the display .scaleEffect and outside any per-layer
@@ -181,7 +188,7 @@ struct PreviewExportView: View {
                         .frame(width: viewSize.width, height: viewSize.height)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
                         )
                         .shadow(radius: 12)
                         
@@ -281,13 +288,31 @@ struct PreviewExportView: View {
                                 .foregroundStyle(.red)
                         }
 
-                        Spacer()
+                        if isMagneticSnapFeatureEnabled {
+                            Spacer()
 
-                        Text("Drag & Pinch Layers Freeform")
-                            .font(.caption)
-                            .foregroundStyle(.gray)
+                            Button {
+                                withAnimation { isSnapEnabled.toggle() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isSnapEnabled ? "checkmark.circle.fill" : "circle")
+                                    Text("Magnetic Snap")
+                                }
+                                .font(.caption)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(Color(white: 0.15))
+                                .cornerRadius(8)
+                                .foregroundStyle(isSnapEnabled ? Color.accentColor : .gray)
+                            }
+                        }
                     }
                     .padding(.horizontal)
+
+                    Text("Drag & Pinch Layers Freeform")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                        .frame(maxWidth: .infinity, alignment: .center)
 
                     if topAudioAvailable || bottomAudioAvailable {
                         Divider()
@@ -353,11 +378,11 @@ struct PreviewExportView: View {
         .onChange(of: bottomAudioVolume) { newValue in
             syncController.bottomPlayer?.volume = newValue
         }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView {
-                isProUnlocked = true
-                performExport()
-            }
+        .sheet(item: $paywallReason) { reason in
+            // Continue into the merge+export the user originally asked for, rather than
+            // performExport() directly -- exportedVideoURL isn't set yet at this point.
+            PaywallView(reason: reason) { runMergeAndSave() }
+                .environmentObject(purchaseManager)
         }
         .sheet(isPresented: $showingShareSheet) {
             if let url = exportedVideoURL {
@@ -437,6 +462,12 @@ struct PreviewExportView: View {
             // A clear next step once the export has actually landed in Photos, instead of
             // leaving the user to find their own way back out via the nav bar.
             if didSaveSuccessfully {
+                Label("Saved directly to your Photos library — nothing was uploaded", systemImage: "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
                 Button {
                     NotificationCenter.default.post(name: .returnToHome, object: nil)
                 } label: {
@@ -464,7 +495,7 @@ struct PreviewExportView: View {
             return "Save to Camera Roll"
         }
 
-        return isFirstExportFree || isProUnlocked ? "Export & Save to Photos" : "Unlock Pro & Export"
+        return usageTracker.canExport(isPro: purchaseManager.isPro) ? "Export & Save to Photos" : "Unlock Pro & Export"
     }
 
     private var exportButtonBackgroundColor: Color {
@@ -522,6 +553,7 @@ struct PreviewExportView: View {
                     activeBottomDragOffset = .zero
                 }
 
+                snapIfNeeded(layerType)
                 checkOffCanvasLimits(renderSize: orientation.renderSize)
             }
 
@@ -542,10 +574,61 @@ struct PreviewExportView: View {
                     bottomLayer.scale *= value
                     activeBottomScale = 1.0
                 }
+                snapIfNeeded(layerType)
                 checkOffCanvasLimits(renderSize: orientation.renderSize)
             }
 
         return SimultaneousGesture(drag, pinch)
+    }
+
+    /// Clamps a layer's scale/offset so its rendered content always fully covers its target
+    /// rect: scale never drops below the base fill scale (that's what creates blank canvas
+    /// gaps), and offset is bounded to whatever "slack" the current zoom level actually allows
+    /// (the same clamp a photo crop tool uses) -- which also keeps the layer from drifting into
+    /// its neighbor's half in landscape. Zooming in further than the fill scale is left alone;
+    /// that's a deliberate reframe, not something to correct.
+    private func snappedLayout(for layerType: LayerType, scale: CGFloat, offset: CGSize) -> (scale: CGFloat, offset: CGSize) {
+        guard let info = layerType == .top ? topTrackInfo : bottomTrackInfo else {
+            return (scale, offset)
+        }
+
+        let role: VideoMerger.MergerLayerType = (layerType == .top)
+            ? (isRolesSwapped ? .bottom : .top)
+            : (isRolesSwapped ? .top : .bottom)
+        let targetRect = VideoMerger.targetRect(for: role, orientation: orientation)
+        let actualSize = info.actualSize
+
+        let baseScale = max(targetRect.width / actualSize.width, targetRect.height / actualSize.height)
+        let clampedScale = max(scale, 1.0)
+        let currentWidth = actualSize.width * baseScale * clampedScale
+        let currentHeight = actualSize.height * baseScale * clampedScale
+
+        let maxOffsetX = max(0, (currentWidth - targetRect.width) / 2)
+        let maxOffsetY = max(0, (currentHeight - targetRect.height) / 2)
+
+        let clampedOffset = CGSize(
+            width: min(max(offset.width, -maxOffsetX), maxOffsetX),
+            height: min(max(offset.height, -maxOffsetY), maxOffsetY)
+        )
+
+        return (clampedScale, clampedOffset)
+    }
+
+    private func snapIfNeeded(_ layerType: LayerType) {
+        guard isMagneticSnapFeatureEnabled, isSnapEnabled else { return }
+
+        let current = layerType == .top ? topLayer : bottomLayer
+        let snapped = snappedLayout(for: layerType, scale: current.scale, offset: current.offset)
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+            if layerType == .top {
+                topLayer.scale = snapped.scale
+                topLayer.offset = snapped.offset
+            } else {
+                bottomLayer.scale = snapped.scale
+                bottomLayer.offset = snapped.offset
+            }
+        }
     }
 
     enum LayerType {
@@ -600,24 +683,30 @@ struct PreviewExportView: View {
 
     private func resetToDefault() {
         isRolesSwapped = false
-        topLayer = VideoLayoutState(scale: 1.0, offset: .zero, isTopMost: false)
-        bottomLayer = VideoLayoutState(scale: 1.0, offset: .zero, isTopMost: true)
         activeTopDragOffset = .zero
         activeTopScale = 1.0
         activeBottomDragOffset = .zero
         activeBottomScale = 1.0
         showOffCanvasWarning = false
+
+        // Route through the same coverage-guarantee math as magnetic snap (independent of
+        // whether that feature is enabled) rather than assuming scale 1 / offset .zero already
+        // covers the new orientation's target rect -- makes "no blank canvas on reset" an
+        // explicit, provable invariant instead of something the base transform math happens to
+        // get right.
+        let top = snappedLayout(for: .top, scale: 1.0, offset: .zero)
+        let bottom = snappedLayout(for: .bottom, scale: 1.0, offset: .zero)
+        topLayer = VideoLayoutState(scale: top.scale, offset: top.offset, isTopMost: false)
+        bottomLayer = VideoLayoutState(scale: bottom.scale, offset: bottom.offset, isTopMost: true)
     }
 
     private func handleExportTap() {
         if exportedVideoURL != nil {
             performExport()
+        } else if usageTracker.canExport(isPro: purchaseManager.isPro) {
+            runMergeAndSave()
         } else {
-            if isFirstExportFree || isProUnlocked {
-                runMergeAndSave()
-            } else {
-                showingPaywall = true
-            }
+            paywallReason = .freeExportsExhausted
         }
     }
 
@@ -723,7 +812,9 @@ struct PreviewExportView: View {
                     isSaving = false
 
                     if success {
-                        exportCount += 1
+                        if !purchaseManager.isPro {
+                            usageTracker.recordSuccessfulExport()
+                        }
                         didSaveSuccessfully = true
                     } else {
                         didSaveSuccessfully = false

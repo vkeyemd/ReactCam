@@ -2,9 +2,23 @@ import SwiftUI
 
 @main
 struct ReactCam1App: App {
+    @StateObject private var purchaseManager = PurchaseManager()
+    @StateObject private var usageTracker: UsageTracker
+    @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        // Must run before UsageTracker() reads its counter below -- existing installs had
+        // unlimited free exports under the old mocked paywall, so this resets them to a fresh
+        // count rather than either honoring a fake "Pro" flag or granting a permanent free unlock.
+        Monetization.migrateLegacyUsageIfNeeded()
+        _usageTracker = StateObject(wrappedValue: UsageTracker())
+    }
+
     var body: some Scene {
         WindowGroup {
             AppLaunchView()
+                .environmentObject(purchaseManager)
+                .environmentObject(usageTracker)
                 .preferredColorScheme(.dark)
                 // Single app-wide accent so every system-styled control (nav links, buttons,
                 // pickers, toggles, alerts) matches one brand color throughout, instead of
@@ -12,13 +26,17 @@ struct ReactCam1App: App {
                 // in others. Sourced from the AccentColor asset, which is set to the same light
                 // blue as the app logo's background.
                 .tint(.accentColor)
+                .task { await purchaseManager.start() }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            // Picks up a refund/revocation that landed while the app was backgrounded.
+            guard newPhase == .active else { return }
+            Task { await purchaseManager.refreshEntitlements() }
         }
     }
 }
 
-/// How long the loading bar takes to fill before handing off to HomeView. Kept in one place so
-/// the bar's animation and the actual transition it gates never drift out of sync -- the bar is
-/// only a truthful "how much longer" indicator if it finishes exactly when the wait does.
+/// How long the launch screen stays up before handing off to HomeView.
 private let launchLoadDuration: Double = 1.0
 
 struct AppLaunchView: View {
@@ -46,11 +64,6 @@ struct AppLaunchView: View {
 }
 
 private struct LaunchScreenView: View {
-    // Starts just above zero (rather than 0) so the bar visibly renders with a sliver of fill
-    // immediately on appear, instead of a beat of looking empty/frozen before the animation
-    // below has a chance to kick in.
-    @State private var progress: Double = 0.05
-
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -67,15 +80,9 @@ private struct LaunchScreenView: View {
                     .font(.largeTitle.bold())
                     .foregroundStyle(.white)
 
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(.white)
-                    .frame(width: 160)
-            }
-        }
-        .onAppear {
-            withAnimation(.linear(duration: launchLoadDuration)) {
-                progress = 1.0
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
             }
         }
     }

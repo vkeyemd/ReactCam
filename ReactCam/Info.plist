@@ -2,8 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CameraPrivacy - Microphone Usage Description</key>
-	<string>ReactCam needs your microphone to capture audio during recording.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ReactCam uses your camera to record reactions. Recordings are processed entirely on your device and are never uploaded.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ReactCam uses your microphone to capture audio during recording. Audio stays on your device and is never uploaded.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ReactCam saves your finished videos to your Photos library. Nothing is ever uploaded or shared without your action.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
