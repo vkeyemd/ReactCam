@@ -26,11 +26,14 @@ struct ReactCam1App: App {
                 // in others. Sourced from the AccentColor asset, which is set to the same light
                 // blue as the app logo's background.
                 .tint(.accentColor)
-                .task { await purchaseManager.start() }
+                .task {
+                    guard Monetization.isEnabled else { return }
+                    await purchaseManager.start()
+                }
         }
         .onChange(of: scenePhase) { newPhase in
             // Picks up a refund/revocation that landed while the app was backgrounded.
-            guard newPhase == .active else { return }
+            guard newPhase == .active, Monetization.isEnabled else { return }
             Task { await purchaseManager.refreshEntitlements() }
         }
     }

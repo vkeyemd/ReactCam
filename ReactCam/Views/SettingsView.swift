@@ -6,25 +6,29 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section("Purchases") {
-                if purchaseManager.isPro {
-                    LabeledContent("ReactCam Pro", value: "Unlocked")
-                } else {
-                    Button("Unlock ReactCam Pro") {
-                        paywallReason = .manualUpgrade
-                    }
-                }
-
-                Button {
-                    Task { await purchaseManager.restorePurchases() }
-                } label: {
-                    if purchaseManager.isRestoring {
-                        ProgressView()
+            // Hidden wholesale rather than disabled: an app with no purchasable product has no
+            // business showing a Restore Purchases row either.
+            if Monetization.isEnabled {
+                Section("Purchases") {
+                    if purchaseManager.isPro {
+                        LabeledContent("ReactCam Pro", value: "Unlocked")
                     } else {
-                        Text("Restore Purchases")
+                        Button("Unlock ReactCam Pro") {
+                            paywallReason = .manualUpgrade
+                        }
                     }
+
+                    Button {
+                        Task { await purchaseManager.restorePurchases() }
+                    } label: {
+                        if purchaseManager.isRestoring {
+                            ProgressView()
+                        } else {
+                            Text("Restore Purchases")
+                        }
+                    }
+                    .disabled(purchaseManager.isRestoring)
                 }
-                .disabled(purchaseManager.isRestoring)
             }
 
             Section {

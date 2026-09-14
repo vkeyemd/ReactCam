@@ -4,6 +4,16 @@ import Foundation
 /// these values anywhere else.
 enum Monetization {
 
+    /// Master switch for the entire paywall. While this is `false` the app ships with no
+    /// monetization surface at all: no purchase or restore UI anywhere, no export or project
+    /// limit enforced, no StoreKit calls made, and the free-export counter frozen so nobody
+    /// quietly burns their allotment during a stretch when nothing is actually gated.
+    ///
+    /// Every monetization type -- PurchaseManager, UsageTracker, PaywallView, and the
+    /// constants below -- stays compiled and intact, so turning the paywall back on is a
+    /// one-line change here plus re-testing the purchase flow.
+    static let isEnabled = false
+
     enum Product {
         /// Non-consumable. Must match the App Store Connect product exactly.
         static let proLifetimeID = "com.objectgraph.reactcam.pro.lifetime"

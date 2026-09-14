@@ -20,20 +20,26 @@ final class UsageTracker: ObservableObject {
         max(0, Monetization.FreeTier.exportLimit - freeExportsUsed)
     }
 
-    /// `true` if the user may export right now. `isPro` always wins.
+    /// `true` if the user may export right now. `isPro` always wins, and nothing is gated at
+    /// all while `Monetization.isEnabled` is off.
     func canExport(isPro: Bool) -> Bool {
-        isPro || freeExportsUsed < Monetization.FreeTier.exportLimit
+        guard Monetization.isEnabled else { return true }
+        return isPro || freeExportsUsed < Monetization.FreeTier.exportLimit
     }
 
     /// `true` if the user may start a new recording that would create another saved project.
     /// `isPro` always wins. Viewing, renaming, deleting, or re-exporting existing projects is
     /// never gated by this -- only pass the count when actually about to create a new one.
     func canCreateProject(currentProjectCount: Int, isPro: Bool) -> Bool {
-        isPro || currentProjectCount < Monetization.FreeTier.projectLimit
+        guard Monetization.isEnabled else { return true }
+        return isPro || currentProjectCount < Monetization.FreeTier.projectLimit
     }
 
-    /// Call ONLY after an export file has been successfully written.
+    /// Call ONLY after an export file has been successfully written. Frozen while the paywall
+    /// is hidden -- otherwise users would spend their free exports during a period when exports
+    /// are unlimited, and hit an already-exhausted counter the moment it's switched back on.
     func recordSuccessfulExport() {
+        guard Monetization.isEnabled else { return }
         freeExportsUsed += 1
         defaults.set(freeExportsUsed, forKey: Monetization.StorageKey.freeExportsUsed)
     }
