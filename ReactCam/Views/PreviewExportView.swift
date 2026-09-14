@@ -948,6 +948,12 @@ class PlayerSyncController: ObservableObject {
     }
 
     func play() {
+        // Every playback start in the editor funnels through here -- the initial auto-play, the
+        // play/pause button, and each loop -- so this is the one place that can guarantee the
+        // session is in a category the Ring/Silent switch can't mute. It also has to be here
+        // rather than in an `onAppear`: arriving from the recording studio, that view's
+        // `onDisappear` -> `tearDown()` -> `deactivate()` races an `onAppear`, and would undo it.
+        AudioSessionManager.configureForPlayback()
         topPlayer?.play()
         bottomPlayer?.play()
         isPlaying = true

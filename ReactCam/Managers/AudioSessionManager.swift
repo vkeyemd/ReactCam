@@ -31,6 +31,31 @@ enum AudioSessionManager {
         configureForReactCam()
     }
     
+    /// Configures routing for the playback-only screens -- the editor, whether it was reached
+    /// from Projects or straight off a recording.
+    ///
+    /// Without this the Projects -> editor path never configures the session at all (nothing on
+    /// it calls `activate()`), so the app sits in iOS's default `.soloAmbient` category, which
+    /// the Ring/Silent switch mutes. That's why a saved project played silently through the
+    /// speaker while headphones still worked: headphones masked a muted category, not a bad
+    /// route. `.playback` is exempt from the silent switch and already prefers the speaker, so
+    /// `.defaultToSpeaker` isn't needed here (it's only valid alongside `.playAndRecord`).
+    static func configureForPlayback() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            // Playback restarts on every loop, so don't rewrite the category when it's already
+            // right. `setActive` still runs each time: after an interruption (a phone call) the
+            // category survives but the session doesn't, and skipping it would leave playback
+            // silent with no way back.
+            if audioSession.category != .playback {
+                try audioSession.setCategory(.playback, mode: .moviePlayback)
+            }
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to configure audio session for playback: \(error)")
+        }
+    }
+
     /// Safely deactivates the session to return audio control to the OS
     static func deactivate() {
         do {
