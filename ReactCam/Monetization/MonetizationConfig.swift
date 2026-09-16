@@ -18,7 +18,13 @@ enum Monetization {
 
     enum Product {
         /// Non-consumable. Must match the App Store Connect product exactly.
-        static let proLifetimeID = "com.objectgraph.reactcam.pro.lifetime"
+        ///
+        /// Replaces `com.objectgraph.reactcam.pro.lifetime`, which became stuck in a
+        /// "Developer Rejected" state App Store Connect wouldn't let us clear or resubmit --
+        /// the product worked in sandbox but could not be attached to a version for review.
+        /// Product IDs can never be reused once created, so the old one is abandoned rather
+        /// than deleted. Nothing is lost: it was never approved, so no customer ever bought it.
+        static let proLifetimeID = "com.objectgraph.reactcam.pro.unlock"
     }
 
     enum FreeTier {

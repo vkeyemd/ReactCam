@@ -1,69 +1,69 @@
 {
-  "identifier" : "8A1C4E2F",
-  "nonRenewingSubscriptions" : [],
-  "products" : [
+  "identifier": "8A1C4E2F",
+  "nonRenewingSubscriptions": [],
+  "products": [
     {
-      "displayPrice" : "7.99",
-      "familyShareable" : false,
-      "internalID" : "8A1C4E2F0001",
-      "localizations" : [
+      "displayPrice": "7.99",
+      "familyShareable": false,
+      "internalID": "8A1C4E2F0001",
+      "localizations": [
         {
-          "description" : "Unlock unlimited exports and unlimited saved projects.",
-          "displayName" : "ReactCam Pro",
-          "locale" : "en_US"
+          "description": "Unlock unlimited exports and unlimited saved projects.",
+          "displayName": "ReactCam Pro",
+          "locale": "en_US"
         }
       ],
-      "productID" : "com.objectgraph.reactcam.pro.lifetime",
-      "referenceName" : "ReactCam Pro Unlock",
-      "type" : "NonConsumable"
+      "productID": "com.objectgraph.reactcam.pro.unlock",
+      "referenceName": "ReactCam Pro Unlock",
+      "type": "NonConsumable"
     }
   ],
-  "settings" : {
-    "_failTransactionsEnabled" : false,
-    "_locale" : "en_US",
-    "_storefront" : "USA",
-    "_storeKitErrors" : [
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": [
       {
-        "current" : null,
-        "name" : "Load Products"
+        "current": null,
+        "name": "Load Products"
       },
       {
-        "current" : null,
-        "name" : "Purchase"
+        "current": null,
+        "name": "Purchase"
       },
       {
-        "current" : null,
-        "name" : "Verification"
+        "current": null,
+        "name": "Verification"
       },
       {
-        "current" : null,
-        "name" : "App Store Sync"
+        "current": null,
+        "name": "App Store Sync"
       },
       {
-        "current" : null,
-        "name" : "Subscription Status"
+        "current": null,
+        "name": "Subscription Status"
       },
       {
-        "current" : null,
-        "name" : "App Transaction"
+        "current": null,
+        "name": "App Transaction"
       },
       {
-        "current" : null,
-        "name" : "Manage Subscriptions Sheet"
+        "current": null,
+        "name": "Manage Subscriptions Sheet"
       },
       {
-        "current" : null,
-        "name" : "Refund Request Sheet"
+        "current": null,
+        "name": "Refund Request Sheet"
       },
       {
-        "current" : null,
-        "name" : "Offer Code Redeem Sheet"
+        "current": null,
+        "name": "Offer Code Redeem Sheet"
       }
     ]
   },
-  "subscriptionGroups" : [],
-  "version" : {
-    "major" : 3,
-    "minor" : 3
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 3
   }
 }
