@@ -1,6 +1,12 @@
 import Combine
 import Foundation
+import OSLog
 import StoreKit
+
+/// StoreKit diagnostics. Local os_log only -- nothing is transmitted, so this does not affect
+/// the app's "Data Not Collected" privacy label. Read it in Console.app with the device
+/// attached, filtering on subsystem com.objectgraph.reactcam.
+private let storeLog = Logger(subsystem: "com.objectgraph.reactcam", category: "StoreKit")
 
 /// Source of truth for the Pro entitlement.
 ///
@@ -76,14 +82,26 @@ final class PurchaseManager: ObservableObject {
     /// Recomputes `isPro` from StoreKit's verified current entitlements.
     func refreshEntitlements() async {
         var unlocked = false
+        var seen = 0
+        var unverified = 0
 
         for await result in Transaction.currentEntitlements {
-            guard let transaction = try? verified(result) else { continue }
-            guard transaction.productID == Monetization.Product.proLifetimeID else { continue }
-            guard transaction.revocationDate == nil else { continue }
-            unlocked = true
+            seen += 1
+            do {
+                let transaction = try verified(result)
+                storeLog.notice("entitlement: \(transaction.productID, privacy: .public) revoked=\(transaction.revocationDate != nil)")
+                guard transaction.productID == Monetization.Product.proLifetimeID else { continue }
+                guard transaction.revocationDate == nil else { continue }
+                unlocked = true
+            } catch {
+                // Previously swallowed by `try?`, which made a verification failure and an empty
+                // entitlement list look identical from the outside.
+                unverified += 1
+                storeLog.error("entitlement failed verification: \(error.localizedDescription, privacy: .public)")
+            }
         }
 
+        storeLog.notice("currentEntitlements: \(seen) total, \(unverified) unverified -> isPro=\(unlocked)")
         isPro = unlocked
     }
 
@@ -104,8 +122,23 @@ final class PurchaseManager: ObservableObject {
             switch try await product.purchase() {
             case .success(let verification):
                 let transaction = try verified(verification)
+                storeLog.notice("purchase verified: \(transaction.productID, privacy: .public) id=\(transaction.id)")
                 await transaction.finish()
                 await refreshEntitlements()
+
+                // A just-verified, unrevoked transaction for our product IS the entitlement --
+                // cryptographically checked by StoreKit, exactly as `currentEntitlements` entries
+                // are. The sandbox intermittently accepts a purchase without surfacing it there
+                // straight away, and discarding a proven purchase because a re-query hasn't
+                // caught up strands a paying customer behind the paywall. This still isn't a
+                // stored bool: the next launch re-derives `isPro` from `currentEntitlements`.
+                if !isPro,
+                   transaction.productID == Monetization.Product.proLifetimeID,
+                   transaction.revocationDate == nil {
+                    storeLog.error("entitlement absent after verified purchase -- granting from the transaction")
+                    isPro = true
+                }
+
                 return isPro
 
             case .userCancelled:
@@ -135,6 +168,7 @@ final class PurchaseManager: ObservableObject {
         do {
             try await AppStore.sync()
             await refreshEntitlements()
+            storeLog.notice("restore finished: isPro=\(self.isPro)")
             notice = isPro ? .restoreSucceeded : .restoreNothingFound
         } catch {
             notice = .failed("Couldn't restore purchases right now. Please try again.")
