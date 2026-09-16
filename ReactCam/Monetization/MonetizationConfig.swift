@@ -9,10 +9,12 @@ enum Monetization {
     /// limit enforced, no StoreKit calls made, and the free-export counter frozen so nobody
     /// quietly burns their allotment during a stretch when nothing is actually gated.
     ///
-    /// Every monetization type -- PurchaseManager, UsageTracker, PaywallView, and the
-    /// constants below -- stays compiled and intact, so turning the paywall back on is a
-    /// one-line change here plus re-testing the purchase flow.
-    static let isEnabled = false
+    /// Turned off once, for the 1.2 rejection under guideline 2.1(b): the reviewer hit the
+    /// paywall's "Retry" dead end because `Product.products(for:)` came back empty. That was
+    /// never a code fault -- the account had no Paid Applications Agreement in effect (the app
+    /// had only ever been free), and StoreKit returns zero products until it is, in sandbox and
+    /// production alike. Banking details are now filed; re-enabled here.
+    static let isEnabled = true
 
     enum Product {
         /// Non-consumable. Must match the App Store Connect product exactly.
