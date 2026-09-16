@@ -309,7 +309,7 @@ struct PreviewExportView: View {
                     }
                     .padding(.horizontal)
 
-                    Text("Drag & Pinch Layers Freeform")
+                    Text("Drag to move · Pinch to resize")
                         .font(.caption)
                         .foregroundStyle(.gray)
                         .frame(maxWidth: .infinity, alignment: .center)
